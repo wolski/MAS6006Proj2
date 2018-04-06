@@ -1,0 +1,117 @@
+% Encoding: UTF-8
+
+@Article{JSS_DiceKrig,
+  author   = {Olivier Roustant and David Ginsbourger and Yves Deville},
+  title    = {DiceKriging, DiceOptim: Two R Packages for the Analysis of Computer Experiments by Kriging-Based Metamodeling and Optimization},
+  journal  = {Journal of Statistical Software, Articles},
+  year     = {2012},
+  volume   = {51},
+  number   = {1},
+  pages    = {1--55},
+  issn     = {1548-7660},
+  abstract = {We present two recently released R packages, DiceKriging and DiceOptim, for the approximation and the optimization of expensive-to-evaluate deterministic functions. Following a self-contained mini tutorial on Kriging-based approximation and optimization, the functionalities of both packages are detailed and demonstrated in two distinct sections. In particular, the versatility of DiceKriging with respect to trend and noise specifications, covariance parameter estimation, as well as conditional and unconditional simulations are illustrated on the basis of several reproducible numerical experiments. We then put to the fore the implementation of sequential and parallel optimization strategies relying on the expected improvement criterion on the occasion of DiceOptim’s presentation. An appendix is dedicated to complementary mathematical and computational details.},
+  doi      = {10.18637/jss.v051.i01},
+  url      = {https://www.jstatsoft.org/v051/i01},
+}
+
+@Article{JSS_DiceEval,
+  author   = {Delphine Dupuy and Céline Helbert and Jessica Franco},
+  title    = {DiceDesign and DiceEval: Two R Packages for Design and Analysis of Computer Experiments},
+  journal  = {Journal of Statistical Software, Articles},
+  year     = {2015},
+  volume   = {65},
+  number   = {11},
+  pages    = {1--38},
+  issn     = {1548-7660},
+  abstract = {This paper introduces two R packages available on the Comprehensive R Archive network. The main application concerns the study of computer code output. Package DiceDesign is dedicated to numerical design of experiments, from the construction to the study of the design properties. Package DiceEval deals with the fit, the validation and the comparison of metamodels. After a brief presentation of the context, we focus on the architecture of these two packages. A two-dimensional test function will be a running example to illustrate the main functionalities of these packages and an industrial case study in five dimensions will also be detailed.},
+  doi      = {10.18637/jss.v065.i11},
+  url      = {https://www.jstatsoft.org/v065/i11},
+}
+
+@Article{OHagan2006,
+  author        = {O’Hagan, Anthony},
+  title         = {Bayesian analysis of computer code outputs: A tutorial},
+  journal       = {Reliability Engineering \& System Safety},
+  year          = {2006},
+  volume        = {91},
+  number        = {10-11},
+  pages         = {1290--1300},
+  __markedentry = {[wewol:6]},
+  publisher     = {Elsevier},
+}
+
+@Misc{stackexchangeGPhyperparameter,
+  title = {Hyperparameter tuning in Gaussian Process Regression},
+  url   = {https://stats.stackexchange.com/questions/155194/hyperparameter-tuning-in-gaussian-process-regression},
+}
+
+@Article{JSS_GPFIT,
+  author   = {Blake MacDonald and Pritam Ranjan and Hugh Chipman},
+  title    = {GPfit: An R Package for Fitting a Gaussian Process Model to Deterministic Simulator Outputs},
+  journal  = {Journal of Statistical Software, Articles},
+  year     = {2015},
+  volume   = {64},
+  number   = {12},
+  pages    = {1--23},
+  issn     = {1548-7660},
+  abstract = {Gaussian process (GP) models are commonly used statistical metamodels for emulating expensive computer simulators. Fitting a GP model can be numerically unstable if any pair of design points in the input space are close together. Ranjan, Haynes, and Karsten (2011) proposed a computationally stable approach for fitting GP models to deterministic computer simulators. They used a genetic algorithm based approach that is robust but computationally intensive for maximizing the likelihood. This paper implements a slightly modified version ofthe model proposed by Ranjan et al.  (2011 ) in the R  package GPfit. A novel parameterization of the spatial correlation function and a clustering based multi-start gradient based optimization algorithm yield robust optimization that is typically faster than the genetic algorithm based approach. We present two examples with R  codes to illustrate the usage of the main functions in GPfit . Several test functions are used for performance comparison with the popular R  package mlegp . We also use GPfit  for a real application, i.e., for emulating the tidal kinetic energy model for the Bay of Fundy, Nova Scotia, Canada. GPfit  is free software and distributed under the General Public License and available from the Comprehensive R Archive Network.},
+  doi      = {10.18637/jss.v064.i12},
+  url      = {https://www.jstatsoft.org/v064/i12},
+}
+
+@Article{JSS_SAVE,
+  author   = {Jesús Palomo and Rui Paulo and Gonzalo García-Donato},
+  title    = {SAVE: An R Package for the Statistical Analysis of Computer Models},
+  journal  = {Journal of Statistical Software, Articles},
+  year     = {2015},
+  volume   = {64},
+  number   = {13},
+  pages    = {1--23},
+  issn     = {1548-7660},
+  abstract = {This paper introduces the R package SAVE which implements statistical methodology for the analysis of computer models. Namely, the package includes routines that perform emulation, calibration and validation of this type of models. The methodology is Bayesian and is essentially that of Bayarri, Berger, Paulo, Sacks, Cafeo, Cavendish, Lin, and Tu (2007). The package is available through the Comprehensive R Archive Network. We illustrate its use with a real data example and in the context of a simulated example.},
+  doi      = {10.18637/jss.v064.i13},
+  url      = {https://www.jstatsoft.org/v064/i13},
+}
+
+@Manual{Rcore,
+  title        = {R: A Language and Environment for Statistical Computing},
+  author       = {{R Core Team}},
+  organization = {R Foundation for Statistical Computing},
+  address      = {Vienna, Austria},
+  year         = {2017},
+  url          = {https://www.R-project.org/},
+}
+
+@Article{mlegp,
+  author  = {Garrett M Dancik and Karin S Dorman},
+  title   = {{mlegp}: statistical analysis for computer models of biological systems using R},
+  journal = {Bioinformatics},
+  year    = {2008},
+  volume  = {24},
+  number  = {17},
+  pages   = {1966},
+}
+
+@Manual{plgp,
+  title  = {plgp: Particle Learning of Gaussian Processes},
+  author = {Robert B. Gramacy},
+  year   = {2014},
+  note   = {R package version 1.1-7},
+  url    = {https://CRAN.R-project.org/package=plgp},
+}
+
+@Article{JSS_tgp,
+  author   = {Robert Gramacy and Matthew Taddy},
+  title    = {Categorical Inputs, Sensitivity Analysis, Optimization and Importance Tempering with tgp Version 2, an R Package for Treed Gaussian Process Models},
+  journal  = {Journal of Statistical Software, Articles},
+  year     = {2010},
+  volume   = {33},
+  number   = {6},
+  pages    = {1--48},
+  issn     = {1548-7660},
+  abstract = {This document describes the new features in version 2.x of the tgp package for R, implementing treed Gaussian process (GP) models. The topics covered include methods for dealing with categorical inputs and excluding inputs from the tree or GP part of the model; fully Bayesian sensitivity analysis for inputs/covariates; sequential optimization of black-box functions; and a new Monte Carlo method for inference in multi-modal posterior distributions that combines simulated tempering and importance sampling. These additions extend the functionality of tgp across all models in the hierarchy: from Bayesian linear models, to classification and regression trees (CART), to treed Gaussian processes with jumps to the limiting linear model. It is assumed that the reader is familiar with the baseline functionality of the package, outlined in the first vignette (Gramacy 2007).},
+  doi      = {10.18637/jss.v033.i06},
+  url      = {https://www.jstatsoft.org/v033/i06},
+}
+
+@Comment{jabref-meta: databaseType:bibtex;}

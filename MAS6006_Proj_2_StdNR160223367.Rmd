@@ -1,0 +1,413 @@
+---
+title: "Emulators in Deterministic Computer Modelling"
+author: "Witold Wolski Std_NR 160223367"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+bibliography: referencesProj2.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warnings=FALSE)
+rm(list=ls())
+library(DiceEval)
+library(DiceDesign)
+library(DiceKriging)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(ggplot2)
+theme_set(theme_classic())
+
+```
+
+# Summary
+
+Evaluating computationally intensive models at thousands of input parameter combinations, which is necessary to perform parameter sensitivity analysis or to calibrate those models, can be prohibitive. Therefore, fast to evaluate emulators might help achieve different types of input-output analysis.
+
+We are asked to test if interpolating Gaussian Processes (GP) can be used to build an emulator. Given 100, 8-dimensional inputs and the corresponding outputs of a deterministic computer model, we have to fit an interpolating GP and do it R [@Rcore]. To measure how well the emulator approximates the simulator, we use a test dataset consisting of 100 8-dimensional input tuples, different from those in the training dataset, and the corresponding responses obtained by evaluating the full computer model. 
+
+
+Furthermore, we are asked to compare the performance of the GP with a multidimensional linear interpolation (MLI) model which is implemented in Matlab using the function `interpn` and was fitted using a different training dataset containing 3^8 points, with inputs placed on a regular grid. This dataset might give us only limited insights into the performance of GP's, since we do not expect a MLI to fit complex response surfaces in high dimensions well with only 3 support points in each dimension.
+
+Therefore, to better understand the power of a GP as well as the complexity of the response surface (since no information about it is given), we also will fit a linear model, and include it in our analysis.
+
+
+# Introduction
+
+A good emulator is a fast to evaluate function $f$ which given inputs $X_1,\dots X_N$ generates in case of deterministic models exactly (with no uncertainty) the outputs $Y_1, \dots, Y_N$. Secondly, it should in a sensible way interpolate and extrapolate the outputs $Y$ for inputs $X$, not in the training set and ideally also give a measure of the uncertainty of these predictions. A sensible way to perform such inter and extrapolation is to require that the function $f$ is smooth. That means that if two close to each other inputs $X$ and $X'$ are evaluated, also the outputs $Y$ and $Y'$ should be relatively close.
+
+Gaussian processes are a reasonable choice to produce functions with these properties [@OHagan2006]. However, the parameters of the Kernel, e.g., a multivariate Gaussian, which determines how the emulator behaves between the design points, need to be specified. They either can be provided as input parameters if known or need to be established. There are different approaches used to assess the model hyperparameters, e.g., MLE or leave one out (LOO) [@JSS_GPFIT, @JSS_DiceKrig].  One has to be aware, however, that these parameters estimation methods might be computationally intensive for large designs (many input-output points in the training dataset) since they might require multiple matrix inversions. Furthermore, identifiability issues might occur, which occur when design points are not close enough relative to the spatial correlation length 
+@JSS_DiceEval. The second problem can, for instance, be addressed by constraining the values of the covariance or by using a penalized MLE[@JSS_DiceKrig]. A further aspect of fitting a GP is that different covariance functions, not only Gaussian can be used to specify the behavior of the responses, e.g., Matern, Exponential or power exponential kernels can be used [@JSS_DiceKrig].
+
+
+Furthermore, a GP can be fitted either to the data or the residues of a linear model. The GP is then used to interpolate the residues of the linear model [@OHagan2006,@JSS_DiceKrig]. To enable the specification of the linear model to be fitted the DiceKrigging package used here allows passing a formula, in the same syntax as the `lm` function in the package stats, to the model fitting function. 
+
+The Figure \@ref(fig:gpIntro) A, B shows how the choice of the user specified covariance parameter influences the smoothness of the curve and shape of 95 confidence interval (CI). Figure \@ref(fig:gpIntro) C shows how removing a linear trend changes the function, especially where it is extrapolated compared with Figure \@ref(fig:gpIntro) B (where the GP is on top of a linear trend). Furthermore, Figure \@ref(fig:gpIntro) D shows the fit and CI when hyperparameter estimation is made using MLE method. Figure \@ref(fig:gpIntro) E shows a Kriging model with a Matern covariance function instead of Gaussian covariance. And finally, Figure \@ref(fig:gpIntro) F illustrates the identifiability problem. Here the MLE estimation of the hyperparameters would have produced a zero covariance if we did not constrain the MLE ($\theta > 0.01$).
+
+
+
+
+```{r exampleData}
+inputs <- c(-1, -0.5, 0, 0.5, 1)
+output <- c(-9, -5, -1, 9, 11)
+theta <- 0.4
+sigma <- 5
+trend <- c(0, 11, 2)
+
+```
+
+
+```{r definePlottingFunction}
+plotAll <- function(t,p,inputs, outputs,main=NULL){
+  plot(t, p$mean, type = "l", xlim = c(-2, 2), ylim = c(-30, 30),
+       xlab = "x", ylab = "y", main=NULL)
+  lines(t, p$lower95, col = "black", lty = 2)
+  lines(t, p$upper95, col = "black", lty = 2)
+  points(inputs, output, col = "red", pch = 19)
+  legend("topleft",legend=main)
+  abline(h = 0)
+}
+```
+
+```{r gpIntro, fig.cap="GP's fitted using the function DiceKrigin::km function. red points - training points. Black line - mean of the gaussian process, dashed lines - lower and upper bounds of the 95 % CI computed at newd ata. A: covtype=Gauss, cov=0.1, var=5^2, formula=~x, B: covtype=Gauss, cov=0.4, var=5^2, formula=~x, C: covtype=Gauss, cov=0.4, var=5^2, formula=~1, D: covtype=Gauss, cov=NULL, var=NULL, formula=~1, E: covtype=matern5_2, cov=NULL, var=NULL, formula=~1, F:  covtype=Gauss, cov=NULL, var=NULL, formula=~1", fig.width=6, fig.height=4}
+
+t <- seq(from = -2, to = 2, length = 20000)
+par(mfrow=c(2,3), mar=c(4,4,1,2))
+#1
+model <- km(formula = ~x, design = data.frame(x = inputs),
+            response = output, covtype = "gauss", coef.trend = NULL,
+            coef.cov = 0.1, coef.var = 5^2, control=list(trace=FALSE))
+p <- predict(model, newdata = data.frame(x = t), type = "SK")
+plotAll(t,p, inputs, outputs, main="A")
+
+#2 
+model <- km(formula = ~x, design = data.frame(x = inputs),
+            response = output, covtype = "gauss", coef.trend = NULL,
+            coef.cov = 0.4, coef.var = 5^2,control=list(trace=FALSE))
+
+p <- predict(model, newdata = data.frame(x = t), type = "SK")
+plotAll(t,p, inputs, outputs ,main="B" )
+#3
+model <- km(formula = ~1, design = data.frame(x = inputs),
+            response = output, covtype = "gauss", coef.trend = NULL,
+            coef.cov = 0.4, coef.var = 5^2,control=list(trace=FALSE))
+p <- predict(model, newdata = data.frame(x = t), type = "SK")
+plotAll(t,p, inputs, outputs ,main="C" )
+#4
+model <- km(formula = ~1, design = data.frame(x = inputs),
+            response = output, covtype = "gauss",optim.method = "BFGS",control=list(trace=FALSE),
+            estim.method="MLE")
+p <- predict(model, newdata = data.frame(x = t), type = "SK")
+plotAll(t,p, inputs, outputs ,main="D")
+#5
+model <- km(formula = ~1, design = data.frame(x = inputs),
+            response = output, covtype = "matern5_2",optim.method = "BFGS",control=list(trace=FALSE),
+            estim.method="MLE")
+p <- predict(model, newdata = data.frame(x = t), type = "SK")
+plotAll(t,p, inputs, outputs ,main="E")
+
+#6
+model <- km(formula = ~x, design = data.frame(x = inputs),
+            response = output, covtype = "gauss", lower = 0.03, control=list(trace=FALSE,pop.size = 250))
+p <- predict(model, newdata = data.frame(x = t), type = "SK")
+plotAll(t,p, inputs, outputs ,main="F")
+```
+
+
+
+# Description of the data
+
+The data available are one training dataset and one test dataset each consisting of 100, 8-dimensional, design points labeled $X1, X2, \dots X8$ and the corresponding simulator output `Y`. The test data also has a column `estimate` with the results of the MLI  (multidimensional linear interpolator). 
+
+To build a good emulator the training points X should cover the entire input parameter space. How to best distribute those points is the subject of active research, since this is key for the performance of the emulator. Many approaches to generate optimal, space-filling designs were developed and implemented in R (see Table \@ref(tab:designpacks) ).
+
+To understand the design of the dataset provided we will use metrics which measure the quality of the design. For instance the _coverage_ criterion measures if a design is close to a regular mesh (for a regular mesh, coverage = 0, smaller better). The  _meshRatio_ is the ratio between the largest minimum distance and the smallest minimum distance, hence for a regular the mesh ratio = 1. Finally, the _mindist_ criterion returns the smallest distance between two points. Larger _mindist_ indicates that the points are spread throughout the experimental domain. We measured the quality of the training and test dataset design using these criteria [@JSS_DiceEval] and compare them with random and maximum entropy designs (see Table 2). We also recreated the design used to train the MLI and include it in the evaluation (`grep3pow8`).
+
+
+```{r readingData}
+testData <- read_csv("test.csv")
+trainData <- read_csv("training.csv")
+```
+
+```{r creatingRegularGrid}
+x <- c(0,0.5,1)
+if(0){
+  regulargrid <- matrix(ncol=8, nrow=3^8)
+  a <- 1
+  for(i in x){
+    for(j in x){
+      for(k in x){
+        for(l in x){
+          for(m in x){
+            for(n in x){
+              for(o in x){
+                for(p in x){
+                  regulargrid[a,]<-c(i,j,k,l,m,n,o,p)
+                  a <- a+1
+                }  
+              }
+            }  
+          }
+        }  
+      }
+    }  
+  }
+}else{
+  dim <-6
+  regulargrid <- matrix(ncol=dim, nrow=3^dim)
+  a <- 1
+  for(i in x){
+    for(j in x){
+      for(k in x){
+        for(l in x){
+          for(m in x){
+            for(n in x){
+            regulargrid[a,]<-c(i,j,k,l,m,n)
+            a <- a+1
+            }
+          }
+        }
+      }  
+    }
+  }
+}
+
+```
+
+
+
+```{r extractingdesign}
+
+Xtrain <- dplyr::select(trainData, starts_with("X"))
+Xtest <- dplyr::select(testData,starts_with("X"))
+n <- 100
+dimension <- 8
+Xrandom <- matrix(runif(n * dimension), ncol = dimension, nrow = n)
+dmax <- dmaxDesign(n, dimension, range = 1, niter_max = 10000)
+Xdmax <- dmax$design
+
+```
+
+
+```{r designCriteria}
+designCriteria <- function(Xt){
+  c(coverage = coverage(Xt),
+    meshRatio = meshRatio(Xt),
+    mindist = mindist(Xt))
+}
+
+designCriteria <- data.frame(
+  data.frame(grid3pow8 = designCriteria(regulargrid), train = designCriteria(Xtrain) , test = designCriteria(Xtest), random = designCriteria(Xrandom), dmax = designCriteria(Xdmax)))
+
+knitr::kable(designCriteria, caption = "coverage, meshRatio and mindist computed for test, training a random and a maximum entropy design.")  
+```
+
+The $3^8$ grid used to train the MLI performs best for the measures shown in table \@ref(tab:designCriteria), but is worst design if it comes to discrepancy criteria (See Table \@ref(tab:discTable)) which describe how strongly a design deviates from a perfectly uniform one [@JSS_DiceEval]. The regular grid projected on one dimension allows only for sampling at three distinct locations. We can conclude that the design used for the training and test data likely is not optimized but reasonable, and potentially much better than the uniform $3^8$ grid.
+
+
+```{r HistogramofY, fig.cap="Histogram of simulated responses for training and test dataset", fig.height=2, fig.width=6 }
+par(mfrow=c(2,2))
+train <- data.frame(name = "train", y= trainData$y)
+sqrttrain <- data.frame(name="sqrt_train", y=sqrt(trainData$y))
+test <- data.frame(name = "test", y= testData$y)
+sqrttest <- data.frame(name="sqrt_test", y=sqrt(testData$y))
+tt <- rbind(train, test)
+sqrtt <- rbind(sqrttrain, sqrttest)
+h1 <- ggplot(tt, aes(y)) + geom_histogram(bins=10) + facet_grid(~name)
+h2 <- ggplot(tt, aes(sqrt(y))) + geom_histogram(bins=10) + facet_grid(~name)# + ylab(expression(sqrt(y)))
+grid.arrange(h1, h2, ncol = 2)
+```
+
+Figure \@ref(fig:HistogramofY) show the distribution of the simulator responses for the train and test data. We observe that the distribution of the responses for the test dataset differs from that for the training dataset which also isn't ideal. We also see that square root transformation of the responses makes their distribution more normal which might simplify the modeling. 
+
+
+# Methods
+
+There are many R-packages for Gaussian Process modeling, e.g., _mlegp_ [@mlegp], _tgp_ [@JSS_tgp], _plgp_ [@plgp],
+_gpfit_ [@JSS_GPFIT]. They differ concerning the methodology used for estimating hyperparameters, or in the variety of available covariance functions. We use here the DiceKriging package [@JSS_DiceKrig] (see [DiceKriging-CRAN](https://cran.r-project.org/web/packages/DiceKriging/index.html)) to fit the GP. Furthermore, the R package DiceEval [@JSS_DiceEval] is used to measure the quality of the fitted models.
+
+
+# Results
+
+We are going to fit five different models: 4 GP's with various parametrizations, one linear model to better understand the response surface and we compare them with MLI results. All the models are summarised in table \@ref(tab:models).
+
+```{r models}
+models <- data.frame(modelName =c("Gauss_SqrtY_Const", "Gauss_SqrtY", "Gauss_Y","Matern_SqrtY","linear_Interpolation", "linear_model"),
+                     method = c("km","km","km","km","interpn","stats::lm"),
+                     design_size = c(100,100,100,100,3^8,100),
+                     response=c("sqrt(y)","sqrt(y)","sqrt(y)","Y","?Y","sqrt(y)" ),
+                     formula= c("~1","~.","~.","~.","NA","~. + I(X1..X8^2) + .^2"),
+                     covariance= c("Gauss","Guass","Gauss","Matern(2,5)","NA","NA"))
+
+models <- models[c(6,1,2,3,4,5),]
+knitr::kable(models, caption="Models fitted, km - GaussKriging::km, NA- not applicable, ?Y transformation of responses unknown.")
+```
+
+Figure \@ref(fig:altman) shows the residues for all fitted models and the provided MLI results. For all the parametrizations the estimates of the covariances obtained by MLE were similar (Appendix Table \@ref(tab:covarianceTab) ). The Appendix also shows the summary of the linear model (Appendix Table \@ref(tab:linearModelSummary)).
+
+```{r}
+Xtrain <- select(trainData, starts_with("X"))
+Ytrain <- select(trainData, -starts_with("X"))
+Xtest <- select(testData, starts_with("X"))
+Ytest <- select(testData, y)
+
+```
+
+
+
+```{r covarianceEstimates}
+linearModel <- modelFit(Xtrain, sqrt(Ytrain), type="Linear", control = list(trace = FALSE,pop.size = 250), 
+                        #formula = y~. + .^2
+                        formula = y~. + I(X1^2) + I(X2^2) + I(X3^2) + I(X4^2) + I(X5^2) + I(X6^2) + I(X7^2) + I(X8^2) + .^2
+)
+modelKrigSqrtGaussConst <- modelFit(Xtrain, sqrt(Ytrain), type="Kriging", control = list(trace = FALSE,pop.size = 250), formula = y~1, covtype="gauss"  )
+modelKrigSqrtGauss <- modelFit(Xtrain, sqrt(Ytrain), type="Kriging", control = list(trace = FALSE,pop.size = 250), formula = y~., covtype="gauss"  )
+modelKrigSqrtMatern <- modelFit(Xtrain, sqrt(Ytrain), type="Kriging", control = list(trace = FALSE,pop.size=250), formula = y~., covtype="matern5_2"  )
+modelKrigGauss <- modelFit(Xtrain, Ytrain, type="Kriging", control = list(trace = FALSE,pop.size=250), formula = y~., covtype="gauss"  )
+
+```
+
+
+
+```{r makingPredictions}
+YpredictKrigGaussSqrtConst <- modelPredict(modelKrigSqrtGaussConst, Xtest)^2
+YpredictlinearModel <- modelPredict(linearModel, Xtest)^2
+YpredictKrigGaussSqrt <- modelPredict(modelKrigSqrtGauss, Xtest)^2
+YpredictKrigGauss <- modelPredict(modelKrigGauss, Xtest)
+YpredictKrigMaternSqrt <- modelPredict(modelKrigSqrtMatern, Xtest)^2
+
+```
+
+
+```{r altman, fig.cap="Altman bland plot showing residues versus y for the four models fitted to the simulator output.",fig.width=9, fig.height=4 }
+dataEval <- data.frame(ytest =Ytest[[1]],  linear_model = YpredictlinearModel,  Gauss_SqrtY_Const = YpredictKrigGaussSqrtConst, Gauss_SqrtY = YpredictKrigGaussSqrt, Gauss_Y=YpredictKrigGauss, Matern_SqrtY=YpredictKrigMaternSqrt,  linear_Interpolation = testData$estimate)
+
+
+longEval <- gather(dataEval, key="predictor", value="y_hat", -ytest)
+
+
+ggplot(longEval, aes(x = ytest, y = y_hat-ytest)) + 
+  geom_point() + ylab(expression(hat(y)-y[test])) + xlab(expression(y[test]))+
+  facet_wrap(~predictor, nrow=1) + geom_hline(aes(yintercept =0), col="darkgreen")
+```
+
+## Model validation and testing
+
+We use four different measures of the goodness of fit of our model: 1) the coefficient of determination (_R2_ - larger better), 2) root mean square error (_RMSE_), 3) mean absolute error (_MAE_), and 4) relative maximum absolute error (_RMA_) [@JSS_DiceEval]. For more details see Appendix.
+
+We evaluate how models are predicting the response for the test dataset and compare the model prediction with the actual response of the simulator. Table \@ref(tab:testres) shows the scores obtained for each model while Figures \@ref(fig:resEval) plots those score to simplify the interpretation.
+
+
+```{r testres}
+library(reshape2)
+EvalModel <- function(ytest, yhat){
+  c(R2 = R2(ytest, yhat), RMSE = RMSE(ytest, yhat),MAE=MAE(ytest, yhat),RMA= RMA(ytest, yhat)$max.value )
+}
+
+evalRes <- with(dataEval, data.frame(
+  linear_model=EvalModel(ytest,linear_model),
+  Gauss_SqrtY=EvalModel(ytest,YpredictKrigGaussSqrt),
+  Matern_SqrtY=EvalModel(ytest,YpredictKrigMaternSqrt),
+  Gauss_Y=EvalModel(ytest,YpredictKrigGauss),
+  Gauss_SqrtY_Const = EvalModel(ytest,YpredictKrigGaussSqrtConst),
+  linear_Inter=EvalModel(ytest,linear_Interpolation)
+))
+knitr::kable(evalRes, caption="Evaluation results for all emulators.")
+
+longEvalRes <- melt(as.matrix(evalRes),varnames = c("measure","model"))
+```
+
+```{r resEval, fig.width=7,fig.height=3, fig.cap="Plots of the 4 performance scores all emulators."}
+ggplot(longEvalRes,aes(x = model, y=value, group=1)) + 
+  facet_wrap(~measure,scales = "free", nrow=1) + 
+  geom_point() +
+  geom_line() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+# General discussion
+
+
+Gaussian processes (GP) can be used to build emulators of high-dimensional computer models (many input parameters), also with complicated although ideally smooth response surfaces. They then can be used to calibrate that simulator [@JSS_SAVE], propose new design points at which to evaluate the simulator [@JSS_DiceKrig] or perform sensitivity analysis[@mlegp].
+
+Building a good model (emulator) of the simulator based on a GP can be challenging. Figure \@ref(fig:gpIntro) illustrates that GP's have many hyperparameters which need to be chosen, estimated or tuned.  It gets even more difficult when the covariance of the outputs changes, or the response surface is not smooth. A further difficulty already discussed is that estimating those hyperparameters can be computationally challenging especially for large designs.
+
+The GP's, fitted using the relatively small training dataset, make an excellent prediction for this particular dataset and are comparable with those obtained using the MLI trained on 60 times larger training dataset. Therefore, no surprise, GPs can be used to replace the MLI. One clear disadvantage of the MLI is that it has to be fitted using a regular grid which in high dimensions is worse than a random design. The performance of the GP can be improved by taking more care designing the points at which the simulator is evaluated.
+
+Some questions emerged in course fo the analysis. We showed that a linear model outperforms some of the fitted GP's (See Table \@ref(tab:testres), and Figure \@ref(fig:resEval)) and does have only a few significant coefficients (see Table \@ref(tab:linearModelSummary)).  Also, the parametrization of the GP does not have a significant impact on the quality of predictions and the covariances for all dimensions are relatively large and of the same order (see Table \@ref(tab:covarianceTab)) indicating that indeed the function is smooth. It seems that the provided data has a response surface which is rather easy to estimate. Therefore, it would be interesting to test the GP with other more challenging datasets and benchmark it against other more sensible types of emulators than the MLI. Even more interesting and conclusive it would be to examine the performance of a GP in a real application, e.g., when calibrating a computer model.
+
+I will provide this document as a Rmarkdown file on [https://github.com/wolski/MAS6006Proj2](https://github.com/wolski/MAS6006Proj2), after the submission deadline.
+
+
+\newpage
+
+# Appendix
+
+## R packages for creating and evaluating designs
+
+```{r designpacks}
+knitr::kable(data.frame(design = c("Latin hypercube design","low discrepancy sequences","maximum entropy designs","strauss designs DiceDesign"),
+                        r_package = c("lhs","randomtoolbox, fOptions","DiceDesign::dmaxDesign","DiceDesign::straussDesig")), caption="R packaes for creating designs.")
+
+```
+
+
+## Estimated covariances
+
+```{r covarianceTab}
+covariance <- data.frame( name = modelKrigSqrtGauss$model@covariance@var.names,
+                          Gauss = modelKrigGauss$model@covariance@range.val,
+                          Gauss_SqrtY = modelKrigSqrtGauss$model@covariance@range.val,
+                          Matern_SqrtY = modelKrigSqrtMatern$model@covariance@range.val,
+                          Gauss_SqrtY_Const = modelKrigSqrtGaussConst$model@covariance@range.val,
+                          stringsAsFactors = F)
+
+knitr::kable( covariance,  caption="Estimated covariances for the 4 GP models fitted.", digits = 2)
+
+```
+
+## Linear model summary
+
+```{r linearModelSummary}
+knitr::kable(broom::tidy(summary(linearModel$model)),caption="Linear model summary.")
+```
+
+
+## Measures of goodness of fit.
+
+$$
+\begin{aligned}
+R2 &= 1- \frac{\sum(y-\hat{y})^2}{\sum(y-\bar{y})^2} & RMSE &= \sqrt{\frac{1}{n}\sum(y-\hat{y})^2}\\
+MAE &= \frac{1}{n}\sum |y-\hat{y}| & RMA &=\frac{\max|y-\hat{y}|}{\sigma_y}
+\end{aligned}
+$$
+
+where $\hat{y}$ are the predicted response and $y$ is the true response.
+
+## Discrepancy criteria
+
+The Lp discrepancy compares a distribution of points to the perfectly uniform design.
+
+
+```{r discTable}
+discCriteria = data.frame(
+  #grep3pow8 = unlist(discrepancyCriteria(regulargrid)),
+  train = unlist(discrepancyCriteria(Xtrain)),
+  test= unlist(discrepancyCriteria(Xtest)),
+  random = unlist(discrepancyCriteria(Xrandom)),
+  dmax = unlist(discrepancyCriteria(Xdmax))
+)
+
+knitr::kable(discCriteria,caption="Discrepancy criteria computed using `DiceDesign:discrepancyCriteria`")
+```
+
+\newpage
+
+# References
+
+
